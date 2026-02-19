@@ -15,6 +15,9 @@ clock = pygame.time.Clock()
 score = 0
 
 #images
+Exit_Image =  pygame.image.load('Exit.png').convert()
+Exit_Image = pygame.transform.scale(Exit_Image, (55, 55))
+
 Background_image = pygame.image.load('Background.png').convert()
 Background_image = pygame.transform.scale(Background_image, (Game_Screen_width, Game_Screen_height))
 
@@ -198,7 +201,7 @@ class Bouncer:
         return
 
 class Base:
-    def __init__(self,x,y,red, green, blue, size = 35):
+    def __init__(self,x,y,red, green, blue, size = 55):
         self.size = size
         self.rect = pygame.Rect(x, y, size, size)
         self.color = (red , green, blue )
@@ -206,6 +209,8 @@ class Base:
 
     def draw(self, surface):
         pygame.draw.rect(surface, self.color, self.rect)
+        screen.blit(Exit_Image, self.rect.topleft)
+
 
 class Stall(Base):
     def __init__(self,x,y,price,text, red = 150 , green= 75, blue = 0, size = 75):
@@ -217,10 +222,22 @@ class Stall(Base):
         self.size = size
         self.rect = pygame.Rect(x, y, size, size)
         self.text= text
+        self.holder = pygame.Rect(self.rect.x, (self.rect.y + self.size + 5), 120,30)
+
 
     def draw(self, surface):
         pygame.draw.rect(surface, self.color, self.rect)
         screen.blit(Shop_image, self.rect.topleft)
+
+        font = pygame.font.SysFont(None, 16)
+        y = self.rect.y + self.size + 5
+        pygame.draw.rect(surface,(255,255,255), self.holder)
+
+        textholder = font.render(self.text, True, (0, 0, 0))
+        screen.blit(textholder, self.holder.topleft)
+        
+
+
     
 
 class Wall:
@@ -350,7 +367,7 @@ class Shop:
     def generate(self):
         self.stalls = []
         self.Home = Base(Game_Screen_width //2, Game_Screen_height //2,0, 200, 0)
-        self.End = Base(Game_Screen_width //2, Game_Screen_height - (Game_Screen_height //15),200, 0, 0)
+        self.End = Base(Game_Screen_width //2, Game_Screen_height - (Game_Screen_height //13),200, 0, 0)
         self.LivesUp = Stall(30, (Game_Screen_height //4),3,"LivesUp - 3 gold")
         self.Invis = Stall(30, (Game_Screen_height //4) * 2,8,"Wall Phase - 8 gold")
         self.SpeedUp = Stall(30, (Game_Screen_height //4) * 3,2,"Speed boost - 2 gold")
@@ -414,24 +431,22 @@ class Shop:
                 stall.curTime = pygame.time.get_ticks()
                 if stall.IntTime == 0:
                     stall.IntTime = pygame.time.get_ticks()
+                print((stall.curTime )/(stall.IntTime+2000 - pygame.time.get_ticks()))
             else:
                 stall.IntTime = 0
                 stall.Newtime = 0
                 stall.curTime = 0
              
             if stall.curTime - 2000 > stall.IntTime and stall.IntTime != 0:
+                    
                     stall.bought = True
                     print(f"bought {stall}")
                     stall.IntTime = 0
                     stall.Newtime = 0
                     stall.curTime = 0
                     print(self.LivesUp.bought)
-        #for stall in self.stalls:
-        #    if stall.bought and arena_current.player.money >= stall.price:
-        #        stall.activate()
-        #        stall.bought = False
-        #        arena_current.player.money -= stall.price
-                
+
+
         if self.LivesUp.bought and arena_current.player.money >= 3:
             arena_current.player.lives += 1
             self.LivesUp.bought = False
@@ -521,16 +536,31 @@ class Arena:
 
     def update_hud(self):
         font = pygame.font.SysFont(None, 32)
+        if self.player.dash:
+            dash_display = self.player.dashCooldown
+        else:
+            dash_display = "Locked"
+        
+        if self.player.invis:
+            invis_display = "Unlocked"
+        else:
+            invis_display = "Locked"
+
         lines = [
             f"round: {self.difficulty}",
             f"lives: {self.player.lives}",
-            f"money: {self.player.money}"
+            f"money: {self.player.money}",
+            f"Dash: {dash_display}",
+            f"Wall Phase: {invis_display}"
         ]
 
-        y = Game_Screen_height + 10
-        for line in lines:
-            textholder = font.render(line, True, (255, 255, 255))  # Only render once!
-            screen.blit(textholder, (hud.left + 10, y))  # Use (x, y) position for each line
+        x = -90
+        for i in range(len(lines)):
+            if i%3 == 0:
+                y = Game_Screen_height + 10
+                x = x + 120
+            textholder = font.render(lines[i], True, (255, 255, 255))  # Only render once!
+            screen.blit(textholder, (hud.left + x, y))  # Use (x, y) position for each line
             y += font.get_height() + 5
             #hud.blit(some_icon, (10, 10))
 
@@ -558,9 +588,7 @@ class Arena:
        
 
     
-    def generate(self):
-        
-      
+    def generate(self):  
         #creating home and end bases
         self.Home = Base(Game_Screen_width //2, Game_Screen_height //15,0, 200, 0)
         self.End = Base(Game_Screen_width //2, Game_Screen_height - (Game_Screen_height //15),200, 0, 0)
@@ -579,7 +607,6 @@ class Arena:
 
         #Generate key
         self.Generate_key()
-        
         #based on difficulty create sliders/bouncers/hunters
         if self.difficulty > 0 and self.passed == True:
             if self.difficulty % 4 == 0 or self.difficulty % 5 == 0:
@@ -649,7 +676,7 @@ class Arena:
                 self.money.draw(screen)
                 self.money.delete()
         
-        self.Home.draw(screen)
+        #self.Home.draw(screen)
         if self.unlocked:
             self.End.draw(screen)
         for wall in self.walls:
@@ -835,6 +862,10 @@ class Arena:
             while (EndTime + 500)> pygame.time.get_ticks():
                 print(self.player.money)
             return 1
+        
+
+#class BossArena():
+
 class Maze():
     def __init__(self):
         pi = 3.14
@@ -895,7 +926,7 @@ class Maze():
         self.End = Base(Game_Screen_width //2, Game_Screen_height - (Game_Screen_height //15),200, 0, 0)
         player_Start_x = (Game_Screen_width //2)+ (self.Home.size //4)
         player_Start_y = (Game_Screen_height //15)+(self.Home.size //4)
-        arena_current.player.rect.x, arena_current.player.rect.y = 100,100#player_Start_x,player_Start_y
+        arena_current.player.rect.x, arena_current.player.rect.y = player_Start_x,player_Start_y #player_Start_x,player_Start_y
         self.walls = self.generate_walls()
         
     def update_walls(self):
@@ -909,7 +940,6 @@ class Maze():
                 self.walls.remove(wall)
                 
     def update(self):
-        print(arena_current.keyPress)
         if arena_current.keyPress == True:
             self.update_walls()
         old_y = arena_current.player.rect.y
@@ -924,14 +954,12 @@ class Maze():
             arena_current.keyPress = True
             arena_current.player.rect.y += arena_current.player.speed
 
-        #print("end of movement y", arena_current.player.rect.y)
 
         for wall in self.walls:
             if arena_current.player.colliderect(wall.rect):
                 arena_current.player.rect.y = old_y  # Undo horizontal movement
                 break
         old_x = arena_current.player.rect.x
-        #print("old x", old_x)
 
         
 
@@ -953,11 +981,7 @@ class Maze():
                 arena_current.player.Time_Used = pygame.time.get_ticks()
                 arena_current.player.dashCooldown = -pygame.time.get_ticks() + (arena_current.player.Time_Used+arena_current.player.dashDelay)
             else:
-                arena_current.player.rect.x += arena_current.player.speed
-        
-        
-        #print("end of movement x", arena_current.player.rect.x)
-        
+                arena_current.player.rect.x += arena_current.player.speed        
                     
         if arena_current.player.dashCooldown > 0:
                 arena_current.player.dashCooldown = -pygame.time.get_ticks() + (arena_current.player.Time_Used + arena_current.player.dashDelay)
@@ -975,16 +999,13 @@ class Maze():
                 return 0
             
         if arena_current.player.colliderect(self.End):
-            print(9)
+            arena_current.difficulty +=1
             return 1
             
         #creating boundaryies for walls y-axis
         
                 
         self.playerLims(old_x,old_y)
-        #print("after lims y", arena_current.player.rect.y)
-
-
 
 init = True
 arena_current = Arena(0)
@@ -1076,4 +1097,3 @@ while init == True:
             pygame.display.flip()
 
             clock.tick(50)
-
